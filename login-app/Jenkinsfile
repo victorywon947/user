@@ -29,24 +29,26 @@ pipeline {
       }
     }
 
-    stage('Deploy to Tomcat (Manager API)') {
-      steps {
+  stage('Deploy to Tomcat (Manager API)') {
+    steps {
         unstash 'war'
         withCredentials([usernamePassword(credentialsId: "${CRED_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-          sh """
-            curl -sf -u "$USER:$PASS" "${TOMCAT_URL_1}/manager/text/undeploy?path=/${APP_NAME}" || true
-            curl -sf -u "$USER:$PASS" \
-              -T login-app/target/${APP_NAME}.war \
-              "${TOMCAT_URL}/manager/text/deploy?path=/${APP_NAME}&update=true"
-          """
-        } 
-          curl -sf -u "$USER:$PASS" "${TOMCAT_URL_2}/manager/text/undeploy?path=/${APP_NAME}" || true
-            curl -sf -u "$USER:$PASS" \
-              -T login-app/target/${APP_NAME}.war \
-              "${TOMCAT_URL}/manager/text/deploy?path=/${APP_NAME}&update=true"
+            sh """
+                # 첫 번째 톰캣 서버에 배포
+                curl -sf -u "$USER:$PASS" "${TOMCAT_URL_1}/manager/text/undeploy?path=/${APP_NAME}" || true
+                curl -sf -u "$USER:$PASS" \
+                    -T login-app/target/${APP_NAME}.war \
+                    "${TOMCAT_URL_1}/manager/text/deploy?path=/${APP_NAME}&update=true"
+
+                # 두 번째 톰캣 서버에 배포
+                curl -sf -u "$USER:$PASS" "${TOMCAT_URL_2}/manager/text/undeploy?path=/${APP_NAME}" || true
+                curl -sf -u "$USER:$PASS" \
+                    -T login-app/target/${APP_NAME}.war \
+                    "${TOMCAT_URL_2}/manager/text/deploy?path=/${APP_NAME}&update=true"
+            """
         }
-      }
     }
+}
   }
 
 
