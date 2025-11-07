@@ -1,55 +1,43 @@
+
+
 pipeline {
-  agent any
-  tools { maven 'maven3' }   // Global Tool에 등록한 이름
-  options { timestamps() }
+    agent any
 
-  environment {
-    APP_NAME   = 'login-app'
-    TOMCAT_URL_1 = 'http://192.168.0.172:7020'
-    TOMCAT_URL_2 = 'http://192.168.0.173:7020'
-    CRED_ID    = 'tomcat-deploy'
-  }
-
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    environment {
+        CRED_ID = 'tomcat-cred'
+        APP_NAME = 'login-app'
+        TOMCAT_URL_1 = 'http://192.168.0.101:8080'
+        TOMCAT_URL_2 = 'http://192.168.0.102:8080'
     }
 
-    stage('Build WAR') {
-      steps {
-        dir('login-app') {
-          sh 'mvn -B clean package -DskipTests'
-          stash includes: 'target/*.war', name: 'war'
-        }
-      }
-      post {
-        success {
-          archiveArtifacts artifacts: 'login-app/target/*.war', fingerprint: true
-        }
-      }
-    }
+    stages {
 
-  stage('Deploy to Tomcat (Manager API)') {
-    steps {
-        unstash 'war'
-        withCredentials([usernamePassword(credentialsId: "${CRED_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-            sh """
-                # 첫 번째 톰캣 서버에 배포
-                curl -sf -u "$USER:$PASS" "${TOMCAT_URL_1}/manager/text/undeploy?path=/${APP_NAME}" || true
-                curl -sf -u "$USER:$PASS" \
-                    -T login-app/target/${APP_NAME}.war \
-                    "${TOMCAT_URL_1}/manager/text/deploy?path=/${APP_NAME}&update=true"
+        stage('Build WAR') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+                stash includes: 'login-app/target/*.war', name: 'war'
+            }
+        }
 
-                # 두 번째 톰캣 서버에 배포
-                curl -sf -u "$USER:$PASS" "${TOMCAT_URL_2}/manager/text/undeploy?path=/${APP_NAME}" || true
-                curl -sf -u "$USER:$PASS" \
-                    -T login-app/target/${APP_NAME}.war \
-                    "${TOMCAT_URL_2}/manager/text/deploy?path=/${APP_NAME}&update=true"
-            """
+        stage('Deploy to Tomcat (Manager API)') {
+            steps {
+                unstash 'war'
+                withCredentials([usernamePassword(credentialsId: "${CRED_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh """
+                        # 첫 번째 톰캣 서버 배포
+                        curl -sf -u "$USER:$PASS" "${TOMCAT_URL_1}/manager/text/undeploy?path=/${APP_NAME}" || true
+                        curl -sf -u "$USER:$PASS" \
+                            -T login-app/target/${APP_NAME}.war \
+                            "${TOMCAT_URL_1}/manager/text/deploy?path=/${APP_NAME}&update=true"
+
+                        # 두 번째 톰캣 서버 배포
+                        curl -sf -u "$USER:$PASS" "${TOMCAT_URL_2}/manager/text/undeploy?path=/${APP_NAME}" || true
+                        curl -sf -u "$USER:$PASS" \
+                            -T login-app/target/${APP_NAME}.war \
+                            "${TOMCAT_URL_2}/manager/text/deploy?path=/${APP_NAME}&update=true"
+                    """
+                }
+            }
         }
     }
 }
-  
-
-
-
